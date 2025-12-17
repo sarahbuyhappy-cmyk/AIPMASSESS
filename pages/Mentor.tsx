@@ -30,6 +30,9 @@ const Mentor: React.FC = () => {
   useEffect(() => {
     if (window.aistudio) {
       window.aistudio.hasSelectedApiKey().then(setHasApiKey);
+    } else {
+      // 如果不在 AI Studio 环境，我们假设用户可能需要手动配置环境变量
+      setHasApiKey(process.env.API_KEY !== undefined && process.env.API_KEY !== "");
     }
   }, []);
 
@@ -37,22 +40,23 @@ const Mentor: React.FC = () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
       setHasApiKey(true);
-      // Optional: Refresh the page or just clear errors
+    } else {
+      // 这里的兜底逻辑解决了点击没反应的问题
+      alert("⚠️ API Key 连接指引：\n\n1. 请确保你在 Vercel Dashboard 中设置了环境变量 'API_KEY'。\n2. 设置完成后，请点击 'Redeploy' 重新部署项目以生效。\n3. 如果你是通过分享链接访问，请联系开发者配置该 Key。");
     }
   };
 
-  // Parse helper to extract suggestions from raw AI text
   const parseAIResponse = (rawText: string): { cleanedText: string, suggestions: string[] } => {
     if (rawText === "ERROR_MISSING_KEY" || rawText === "ERROR_KEY_NOT_FOUND") {
       return { 
-        cleanedText: "### ⚠️ API Key Required\nTo use the AI Coach, you need to connect your Gemini API key. \n\n**If you are demonstrating:** Click the button below to link your key.\n\n**If you are the developer:** Add `API_KEY` to Vercel environment variables.", 
-        suggestions: ["Connect now", "How do I get a key?"] 
+        cleanedText: "### ⚠️ 缺少 API Key\n由于 `process.env.API_KEY` 为空，AI 教练无法启动。\n\n**解决方法：**\n1. 前往 Vercel 项目设置 -> Environment Variables。\n2. 添加一个新的变量：名字填 `API_KEY`，值填入你的 Gemini Key。\n3. 重新部署 (Redeploy) 你的项目。\n\n**演示模式：** 你也可以点击下方的“连接 Key”尝试手动授权。", 
+        suggestions: ["连接 Key", "如何获取 Key?"] 
       };
     }
     if (rawText === "ERROR_INVALID_KEY") {
       return { 
-        cleanedText: "### ❌ Invalid API Key\nThe current Key is not authorized. Please ensure you are using a valid Gemini API Key from a project with billing enabled (or a valid free tier key).", 
-        suggestions: ["Connect now", "Check API Console"] 
+        cleanedText: "### ❌ API Key 无效\n当前的 API Key 被 Google 拒绝了。请检查你的 Key 是否正确，或者额度是否已用完。", 
+        suggestions: ["重新连接", "前往 API 控制台"] 
       };
     }
 
@@ -111,15 +115,15 @@ const Mentor: React.FC = () => {
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     
-    if (textToSend === "Connect now") {
+    if (textToSend === "连接 Key" || textToSend === "重新连接") {
         handleConnectKey();
         return;
     }
-    if (textToSend === "How do I get a key?") {
+    if (textToSend === "如何获取 Key?") {
         window.open("https://aistudio.google.com/app/apikey", "_blank");
         return;
     }
-    if (textToSend === "Check API Console") {
+    if (textToSend === "前往 API 控制台") {
         window.open("https://aistudio.google.com/", "_blank");
         return;
     }
@@ -146,7 +150,7 @@ const Mentor: React.FC = () => {
       setMessages(prev => [...prev, botMsg]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please check your configuration.", timestamp: Date.now() }]);
+      setMessages(prev => [...prev, { role: 'model', text: "抱歉，系统响应异常。请检查网络或 API Key 配置。", timestamp: Date.now() }]);
     } finally {
       setLoading(false);
     }
@@ -182,7 +186,7 @@ const Mentor: React.FC = () => {
                     <span>Powered by Gemini 3 Flash</span>
                     {profile && (
                         <span className="bg-slate-800 text-blue-300 px-2 py-0.5 rounded text-xs border border-slate-700">
-                            Tailored for: {profile.role} in {profile.industry}
+                            Learner: {profile.name}
                         </span>
                     )}
                 </div>
@@ -192,9 +196,9 @@ const Mentor: React.FC = () => {
             {!hasApiKey && (
               <button 
                 onClick={handleConnectKey}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg"
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg animate-pulse"
               >
-                <Key size={14} /> Link API Key
+                <Key size={14} /> 连接 API Key
               </button>
             )}
         </div>
@@ -224,12 +228,12 @@ const Mentor: React.FC = () => {
                             key={i}
                             onClick={() => handleSend(action)}
                             className={`text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
-                              action === "Connect now" 
+                              (action === "连接 Key" || action === "重新连接") 
                               ? "bg-amber-600/20 border-amber-500 text-amber-400 hover:bg-amber-600/40" 
                               : "bg-slate-900 border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300"
                             }`}
                           >
-                              {action === "Connect now" ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
+                              {(action === "连接 Key" || action === "重新连接") ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
                           </button>
                       ))}
                   </div>
@@ -256,7 +260,7 @@ const Mentor: React.FC = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about RAG architectures, mock interviews, or ethics..."
+              placeholder="Ask about AI Strategy, MLOps, or mock interviews..."
               className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-4 pr-12 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             />
             <button 

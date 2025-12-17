@@ -9,8 +9,6 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-// Fix: Moving AIStudio interface inside declare global and making aistudio optional
-// to resolve "identical modifiers" error and name shadowing conflict.
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
@@ -31,10 +29,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       if (window.aistudio) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         setHasApiKey(hasKey);
+      } else {
+        setHasApiKey(process.env.API_KEY !== undefined && process.env.API_KEY !== "");
       }
     };
     checkKey();
-    // Re-check periodically or on focus
     window.addEventListener('focus', checkKey);
     return () => window.removeEventListener('focus', checkKey);
   }, []);
@@ -42,7 +41,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleConnectKey = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      setHasApiKey(true); // Assume success per instructions
+      setHasApiKey(true);
+    } else {
+      alert("⚠️ 环境提示：\n\n如果你在 Vercel 运行，请确保已经在 Vercel 控制台设置了名为 'API_KEY' 的环境变量。\n\n如果你是第一次设置，请记得点击 'Redeploy' 重新部署以应用变量。");
     }
   };
 
@@ -95,11 +96,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               onClick={handleConnectKey}
               className="w-full flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-sm font-bold animate-pulse"
             >
-              <Key size={16} /> Connect Gemini API
+              <Key size={16} /> 连接 Gemini API
             </button>
           ) : (
             <div className="flex items-center gap-2 px-4 py-2 text-[10px] text-emerald-500 uppercase font-bold tracking-widest bg-emerald-500/5 rounded-lg border border-emerald-500/10">
-              <CheckCircle size={12} /> API Connected
+              <CheckCircle size={12} /> API 已就绪
             </div>
           )}
         </div>
@@ -116,14 +117,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="flex-1 min-w-0">
                  <div className="text-sm font-bold text-white truncate">{profile?.name || 'Guest User'}</div>
                  <div className="text-xs text-slate-500 truncate group-hover:text-blue-400 transition-colors">
-                    {profile?.role ? `${profile.role} • ${profile.industry}` : 'Setup Learner DNA'}
+                    {profile?.role ? `${profile.role} • ${profile.industry}` : '完善你的背景'}
                  </div>
               </div>
            </button>
-        </div>
-
-        <div className="px-6 pb-4 pt-2 text-[10px] text-slate-600 text-center">
-          v1.2.1 • AI-Personalized
         </div>
       </aside>
 
@@ -140,7 +137,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </button>
       </div>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-40 bg-slate-900/95 backdrop-blur-sm pt-20 px-6">
           <nav className="flex flex-col space-y-4">
@@ -166,25 +163,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               onClick={handleConnectKey}
               className="flex items-center gap-3 px-4 py-4 rounded-xl text-lg bg-amber-500/20 text-amber-400 border border-amber-500/30"
             >
-              <Key size={20} /> Connect API Key
+              <Key size={20} /> 连接 API Key
             </button>
           )}
-          <button 
-             onClick={() => {
-                 setProfileModalOpen(true);
-                 setIsMobileMenuOpen(false);
-             }}
-             className="flex items-center gap-3 px-4 py-4 rounded-xl text-lg text-slate-400 hover:bg-slate-800 border border-dashed border-slate-700 mt-4"
-          >
-             <User size={20} />
-             <span className="font-medium">Update Profile</span>
-          </button>
           </nav>
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-slate-900 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-800/40 via-slate-900 to-slate-900">
+      <main className="flex-1 overflow-y-auto bg-slate-900">
         <div className="max-w-6xl mx-auto p-6 md:p-12">
           {children}
         </div>
