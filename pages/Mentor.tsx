@@ -31,7 +31,6 @@ const Mentor: React.FC = () => {
     if (window.aistudio) {
       window.aistudio.hasSelectedApiKey().then(setHasApiKey);
     } else {
-      // 如果不在 AI Studio 环境，我们假设用户可能需要手动配置环境变量
       setHasApiKey(process.env.API_KEY !== undefined && process.env.API_KEY !== "");
     }
   }, []);
@@ -41,22 +40,21 @@ const Mentor: React.FC = () => {
       await window.aistudio.openSelectKey();
       setHasApiKey(true);
     } else {
-      // 这里的兜底逻辑解决了点击没反应的问题
-      alert("⚠️ API Key 连接指引：\n\n1. 请确保你在 Vercel Dashboard 中设置了环境变量 'API_KEY'。\n2. 设置完成后，请点击 'Redeploy' 重新部署项目以生效。\n3. 如果你是通过分享链接访问，请联系开发者配置该 Key。");
+      alert("⚠️ API Key Connection Guide:\n\n1. Ensure you have set the environment variable 'API_KEY' in your Vercel Dashboard.\n2. After setting it, click 'Redeploy' for the changes to take effect.\n3. If you are accessing this via a shared link, please contact the developer to configure the key.");
     }
   };
 
   const parseAIResponse = (rawText: string): { cleanedText: string, suggestions: string[] } => {
     if (rawText === "ERROR_MISSING_KEY" || rawText === "ERROR_KEY_NOT_FOUND") {
       return { 
-        cleanedText: "### ⚠️ 缺少 API Key\n由于 `process.env.API_KEY` 为空，AI 教练无法启动。\n\n**解决方法：**\n1. 前往 Vercel 项目设置 -> Environment Variables。\n2. 添加一个新的变量：名字填 `API_KEY`，值填入你的 Gemini Key。\n3. 重新部署 (Redeploy) 你的项目。\n\n**演示模式：** 你也可以点击下方的“连接 Key”尝试手动授权。", 
-        suggestions: ["连接 Key", "如何获取 Key?"] 
+        cleanedText: "### ⚠️ Missing API Key\nThe AI Coach cannot start because `process.env.API_KEY` is empty.\n\n**How to fix:**\n1. Go to Vercel Project Settings -> Environment Variables.\n2. Add a new variable: Key: `API_KEY`, Value: [Your Gemini API Key].\n3. Redeploy your project.\n\n**Demo Mode:** You can also click 'Connect Key' below to authorize manually.", 
+        suggestions: ["Connect Key", "How to get a Key?"] 
       };
     }
     if (rawText === "ERROR_INVALID_KEY") {
       return { 
-        cleanedText: "### ❌ API Key 无效\n当前的 API Key 被 Google 拒绝了。请检查你的 Key 是否正确，或者额度是否已用完。", 
-        suggestions: ["重新连接", "前往 API 控制台"] 
+        cleanedText: "### ❌ Invalid API Key\nThe current API Key was rejected. Please check if your key is correct or if your quota has been exceeded.", 
+        suggestions: ["Reconnect Key", "Go to API Console"] 
       };
     }
 
@@ -115,15 +113,15 @@ const Mentor: React.FC = () => {
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     
-    if (textToSend === "连接 Key" || textToSend === "重新连接") {
+    if (textToSend === "Connect Key" || textToSend === "Reconnect Key") {
         handleConnectKey();
         return;
     }
-    if (textToSend === "如何获取 Key?") {
+    if (textToSend === "How to get a Key?") {
         window.open("https://aistudio.google.com/app/apikey", "_blank");
         return;
     }
-    if (textToSend === "前往 API 控制台") {
+    if (textToSend === "Go to API Console") {
         window.open("https://aistudio.google.com/", "_blank");
         return;
     }
@@ -150,7 +148,7 @@ const Mentor: React.FC = () => {
       setMessages(prev => [...prev, botMsg]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "抱歉，系统响应异常。请检查网络或 API Key 配置。", timestamp: Date.now() }]);
+      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please check your network or API Key configuration.", timestamp: Date.now() }]);
     } finally {
       setLoading(false);
     }
@@ -198,7 +196,7 @@ const Mentor: React.FC = () => {
                 onClick={handleConnectKey}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg animate-pulse"
               >
-                <Key size={14} /> 连接 API Key
+                <Key size={14} /> Connect API Key
               </button>
             )}
         </div>
@@ -228,12 +226,12 @@ const Mentor: React.FC = () => {
                             key={i}
                             onClick={() => handleSend(action)}
                             className={`text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
-                              (action === "连接 Key" || action === "重新连接") 
+                              (action === "Connect Key" || action === "Reconnect Key") 
                               ? "bg-amber-600/20 border-amber-500 text-amber-400 hover:bg-amber-600/40" 
                               : "bg-slate-900 border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300"
                             }`}
                           >
-                              {(action === "连接 Key" || action === "重新连接") ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
+                              {(action === "Connect Key" || action === "Reconnect Key") ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
                           </button>
                       ))}
                   </div>
