@@ -10,7 +10,8 @@ export const generateMentorResponse = async (
   try {
     const apiKey = process.env.API_KEY;
     
-    // Attempt to use the key even if it looks empty, to catch the actual API error
+    // We attempt to initialize the AI client. 
+    // If apiKey is truly missing, the SDK will throw an error we catch below.
     const ai = new GoogleGenAI({ apiKey: apiKey || "" });
     
     let learnerContext = "";
@@ -48,15 +49,19 @@ ${learnerContext}
     return response.text || "I'm having trouble thinking right now.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    const msg = error?.message || "";
-    // If we get a clear authentication error, return a specific code for the UI
-    if (msg.includes("API key not valid") || msg.includes("invalid") || msg.includes("403") || msg.includes("API_KEY_INVALID")) {
+    const msg = error?.message?.toLowerCase() || "";
+    
+    // Specific error handling for key issues
+    if (msg.includes("api key not valid") || msg.includes("invalid") || msg.includes("403")) {
       return "ERROR_AUTH_FAILURE";
     }
-    if (msg.includes("API key not found") || msg.includes("404") || !process.env.API_KEY) {
+    
+    // If the error message suggests the key is missing or the variable is literally not there
+    if (msg.includes("api key not found") || msg.includes("404") || !process.env.API_KEY) {
        return "ERROR_MISSING_KEY";
     }
-    return `Error: ${msg || "The model is currently unavailable."}`;
+    
+    return `Error: ${error?.message || "The model is currently unavailable."}`;
   }
 };
 
@@ -102,7 +107,7 @@ export const evaluateQuizAnswer = async (
      return { 
        level: 1, 
        score: 0, 
-       feedback: "Evaluation failed. Please ensure a valid Gemini API Key is configured in the environment or selected via the Connect button." 
+       feedback: "Evaluation failed. Please ensure your API_KEY is set in Vercel and the project has been REDEPLOYED." 
      };
    }
 };
