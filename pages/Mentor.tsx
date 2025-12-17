@@ -2,13 +2,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { generateMentorResponse } from '../services/geminiService';
 import { Message } from '../types';
-import { Send, Bot, User, Loader2, ArrowLeft, MessageSquarePlus } from 'lucide-react';
+import { Send, Bot, User, Loader2, ArrowLeft, MessageSquarePlus, Key, ExternalLink, AlertTriangle } from 'lucide-react';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
 const Mentor: React.FC = () => {
   const { profile } = useUser();
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
   
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -26,8 +27,35 @@ const Mentor: React.FC = () => {
   const navigate = useNavigate();
   const hasAutoSentRef = useRef(false);
 
+  useEffect(() => {
+    if (window.aistudio) {
+      window.aistudio.hasSelectedApiKey().then(setHasApiKey);
+    }
+  }, []);
+
+  const handleConnectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true);
+      // Optional: Refresh the page or just clear errors
+    }
+  };
+
   // Parse helper to extract suggestions from raw AI text
   const parseAIResponse = (rawText: string): { cleanedText: string, suggestions: string[] } => {
+    if (rawText === "ERROR_MISSING_KEY" || rawText === "ERROR_KEY_NOT_FOUND") {
+      return { 
+        cleanedText: "### ⚠️ API Key Required\nTo use the AI Coach, you need to connect your Gemini API key. \n\n**If you are demonstrating:** Click the button below to link your key.\n\n**If you are the developer:** Add `API_KEY` to Vercel environment variables.", 
+        suggestions: ["Connect now", "How do I get a key?"] 
+      };
+    }
+    if (rawText === "ERROR_INVALID_KEY") {
+      return { 
+        cleanedText: "### ❌ Invalid API Key\nThe current Key is not authorized. Please ensure you are using a valid Gemini API Key from a project with billing enabled (or a valid free tier key).", 
+        suggestions: ["Connect now", "Check API Console"] 
+      };
+    }
+
     const parts = rawText.split('---FOLLOW_UP---');
     const cleanedText = parts[0].trim();
     let suggestions: string[] = [];
@@ -39,7 +67,6 @@ const Mentor: React.FC = () => {
     return { cleanedText, suggestions };
   };
 
-  // Update initial message if profile changes
   useEffect(() => {
     if (profile && messages.length === 1 && messages[0].role === 'model' && !hasAutoSentRef.current) {
          setMessages([{
@@ -50,7 +77,6 @@ const Mentor: React.FC = () => {
     }
   }, [profile]);
 
-  // Handle auto-query from navigation
   useEffect(() => {
     if (location.state && location.state.initialQuery && !hasAutoSentRef.current) {
         const query = location.state.initialQuery;
@@ -84,6 +110,20 @@ const Mentor: React.FC = () => {
 
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
+    
+    if (textToSend === "Connect now") {
+        handleConnectKey();
+        return;
+    }
+    if (textToSend === "How do I get a key?") {
+        window.open("https://aistudio.google.com/app/apikey", "_blank");
+        return;
+    }
+    if (textToSend === "Check API Console") {
+        window.open("https://aistudio.google.com/", "_blank");
+        return;
+    }
+
     if (!textToSend.trim() || loading) return;
 
     const userMsg: Message = { role: 'user', text: textToSend, timestamp: Date.now() };
@@ -106,7 +146,7 @@ const Mentor: React.FC = () => {
       setMessages(prev => [...prev, botMsg]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error.", timestamp: Date.now() }]);
+      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please check your configuration.", timestamp: Date.now() }]);
     } finally {
       setLoading(false);
     }
@@ -131,21 +171,32 @@ const Mentor: React.FC = () => {
             </button>
         )}
 
-        <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-blue-600 to-emerald-500 p-3 rounded-xl shadow-lg shadow-blue-900/20">
-            <Bot size={24} className="text-white" />
+        <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-tr from-blue-600 to-emerald-500 p-3 rounded-xl shadow-lg shadow-blue-900/20">
+                <Bot size={24} className="text-white" />
+                </div>
+                <div>
+                <h1 className="text-2xl font-bold text-white">AI Coach</h1>
+                <div className="text-slate-400 text-sm flex items-center gap-2">
+                    <span>Powered by Gemini 3 Flash</span>
+                    {profile && (
+                        <span className="bg-slate-800 text-blue-300 px-2 py-0.5 rounded text-xs border border-slate-700">
+                            Tailored for: {profile.role} in {profile.industry}
+                        </span>
+                    )}
+                </div>
+                </div>
             </div>
-            <div>
-            <h1 className="text-2xl font-bold text-white">AI Coach</h1>
-            <div className="text-slate-400 text-sm flex items-center gap-2">
-                <span>Powered by Gemini 2.5 Flash</span>
-                {profile && (
-                    <span className="bg-slate-800 text-blue-300 px-2 py-0.5 rounded text-xs border border-slate-700">
-                        Tailored for: {profile.role} in {profile.industry}
-                    </span>
-                )}
-            </div>
-            </div>
+            
+            {!hasApiKey && (
+              <button 
+                onClick={handleConnectKey}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg"
+              >
+                <Key size={14} /> Link API Key
+              </button>
+            )}
         </div>
       </div>
 
@@ -160,22 +211,25 @@ const Mentor: React.FC = () => {
                 <div className={`rounded-2xl px-5 py-3 text-sm leading-relaxed ${
                     msg.role === 'user' 
                     ? 'bg-slate-800 text-slate-100 rounded-tr-sm' 
-                    : 'bg-blue-900/20 text-blue-100 border border-blue-800/30 rounded-tl-sm'
+                    : 'bg-blue-900/20 text-blue-100 border border-blue-800/30 rounded-tl-sm shadow-inner'
                 }`}>
                     <MarkdownRenderer content={msg.text} />
                 </div>
               </div>
               
-              {/* Render Suggested Actions Chips */}
               {msg.role === 'model' && msg.suggestedActions && msg.suggestedActions.length > 0 && idx === messages.length - 1 && !loading && (
                   <div className="ml-12 mt-3 flex flex-wrap gap-2 animate-fade-in">
                       {msg.suggestedActions.map((action, i) => (
                           <button
                             key={i}
                             onClick={() => handleSend(action)}
-                            className="text-xs bg-slate-900 border border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
+                            className={`text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
+                              action === "Connect now" 
+                              ? "bg-amber-600/20 border-amber-500 text-amber-400 hover:bg-amber-600/40" 
+                              : "bg-slate-900 border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300"
+                            }`}
                           >
-                              <MessageSquarePlus size={12} /> {action}
+                              {action === "Connect now" ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
                           </button>
                       ))}
                   </div>
@@ -208,7 +262,7 @@ const Mentor: React.FC = () => {
             <button 
               onClick={() => handleSend()}
               disabled={loading || !input.trim()}
-              className="absolute right-2 top-2 p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="absolute right-2 top-2 p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg disabled:opacity-50 transition-colors"
             >
               <Send size={18} />
             </button>

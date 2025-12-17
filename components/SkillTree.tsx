@@ -295,8 +295,8 @@ const SkillTree: React.FC = () => {
     const centerY = height / 2;
     
     // Adjusted radii to "pull in" the nodes and avoid label clipping
-    const dimRadius = 125; // Slightly reduced from 140
-    const skillRadiusBase = 260; // Reduced from 340 to provide more edge space
+    const dimRadius = 125; 
+    const skillRadiusBase = 260; 
 
     // 1. Calculate Dimension Positions
     const dimNodes = SKILL_TREE_DATA.map((dim, i) => {
@@ -326,9 +326,8 @@ const SkillTree: React.FC = () => {
                 const childAngle = count === 1 ? dim.angle : startAngle + (j * step);
                 
                 // --- STAGGERED RING LOGIC ---
-                // Every other child is pushed further out to prevent text overlap.
                 const ringIndex = j % 2; 
-                const radius = skillRadiusBase + (ringIndex * 60); // Adjusted from 70
+                const radius = skillRadiusBase + (ringIndex * 60); 
                 
                 const childNode = {
                     ...child,
@@ -389,7 +388,7 @@ const SkillTree: React.FC = () => {
                    
                    const isLeft = node.x < centerX;
                    const dx = Math.abs(node.x - centerX);
-                   const isVerticalMiddle = dx < 60; // Increased threshold for middle check
+                   const isVerticalMiddle = dx < 60; 
                    
                    let textAnchor: "start" | "end" | "middle" = isLeft ? "end" : "start";
                    let textX = isLeft ? node.x - 18 : node.x + 18;
@@ -407,6 +406,18 @@ const SkillTree: React.FC = () => {
                             onClick={() => !isDim && handleSkillSelect(node)} 
                             className={`${isDim ? 'cursor-default' : 'cursor-pointer group'}`}
                         >
+                           {/* Transparent hit area to make the label easier to click */}
+                           {!isDim && (
+                               <rect 
+                                 x={textAnchor === 'start' ? textX : (textAnchor === 'end' ? textX - 150 : textX - 75)}
+                                 y={node.y + textYOffset - 15}
+                                 width={textAnchor === 'middle' ? 150 : 150}
+                                 height="25"
+                                 fill="transparent"
+                                 className="cursor-pointer"
+                               />
+                           )}
+
                            {!isDim && (
                                <circle 
                                     cx={node.x} cy={node.y} r={isMastered ? 15 : 0} 
@@ -433,8 +444,7 @@ const SkillTree: React.FC = () => {
                                 fontWeight={isDim ? "bold" : (isMastered ? "bold" : "500")}
                                 className={`uppercase tracking-wider transition-all duration-300 ${!isDim && 'group-hover:fill-white group-hover:scale-110'}`}
                                 style={{ 
-                                    textShadow: '0px 0px 6px rgba(0,0,0,1)',
-                                    pointerEvents: 'none'
+                                    textShadow: '0px 0px 6px rgba(0,0,0,1)'
                                 }}
                            >
                                 {node.label}
@@ -446,7 +456,7 @@ const SkillTree: React.FC = () => {
            
            <div className="absolute bottom-6 right-6 text-[10px] text-slate-600 italic text-right pointer-events-none bg-slate-950/80 px-2 py-1 rounded">
                * Constellation Map: Inner Ring = Core Competencies, Staggered Outer Stars = Specific Skills.<br/>
-               The map has been centered to ensure labels remain visible on all screen sizes.
+               Labels are now directly clickable.
            </div>
         </div>
     );
@@ -537,7 +547,7 @@ const SkillTree: React.FC = () => {
                 <p className="text-slate-400 text-sm max-w-xl">
                 A non-overlapping constellation of core concepts. <br/>
                 <strong>Inner Ring:</strong> Competencies. <strong>Staggered Stars:</strong> Granular Skills (Optimized for visibility).<br/>
-                Click any star for pragmatic insights.
+                Click any star or label for pragmatic insights.
                 </p>
             </div>
             

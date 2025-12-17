@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BrainCircuit, Map, Activity, Wrench, MessageSquare, Menu, X, User } from 'lucide-react';
+import { BrainCircuit, Map, Activity, Wrench, MessageSquare, Menu, X, User, Key, CheckCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import UserProfileModal from './UserProfileModal';
 
@@ -9,9 +9,42 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+// Fix: Moving AIStudio interface inside declare global and making aistudio optional
+// to resolve "identical modifiers" error and name shadowing conflict.
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    aistudio?: AIStudio;
+  }
+}
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
   const { setProfileModalOpen, profile } = useUser();
+
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(hasKey);
+      }
+    };
+    checkKey();
+    // Re-check periodically or on focus
+    window.addEventListener('focus', checkKey);
+    return () => window.removeEventListener('focus', checkKey);
+  }, []);
+
+  const handleConnectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true); // Assume success per instructions
+    }
+  };
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <Activity size={20} /> },
@@ -55,6 +88,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           ))}
         </nav>
 
+        {/* API Key Connection Section */}
+        <div className="px-4 py-2">
+          {!hasApiKey ? (
+            <button 
+              onClick={handleConnectKey}
+              className="w-full flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-sm font-bold animate-pulse"
+            >
+              <Key size={16} /> Connect Gemini API
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2 text-[10px] text-emerald-500 uppercase font-bold tracking-widest bg-emerald-500/5 rounded-lg border border-emerald-500/10">
+              <CheckCircle size={12} /> API Connected
+            </div>
+          )}
+        </div>
+
         {/* User Profile Section */}
         <div className="p-4 border-t border-slate-800">
            <button 
@@ -74,7 +123,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         <div className="px-6 pb-4 pt-2 text-[10px] text-slate-600 text-center">
-          v1.2.0 • AI-Personalized
+          v1.2.1 • AI-Personalized
         </div>
       </aside>
 
@@ -112,6 +161,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <span className="font-medium">{item.name}</span>
             </NavLink>
           ))}
+          {!hasApiKey && (
+            <button 
+              onClick={handleConnectKey}
+              className="flex items-center gap-3 px-4 py-4 rounded-xl text-lg bg-amber-500/20 text-amber-400 border border-amber-500/30"
+            >
+              <Key size={20} /> Connect API Key
+            </button>
+          )}
           <button 
              onClick={() => {
                  setProfileModalOpen(true);
