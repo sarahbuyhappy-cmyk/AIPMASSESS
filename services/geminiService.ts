@@ -2,14 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizResult, LearnerProfile } from '../types';
 
-/**
- * Helper to get the API key. It checks process.env first.
- * The GoogleGenAI instance is created fresh to pick up any key changes.
- */
+// Use process.env.API_KEY directly as required by the guidelines.
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) return null;
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export const generateMentorResponse = async (
@@ -19,7 +14,6 @@ export const generateMentorResponse = async (
 ): Promise<string> => {
   try {
     const ai = getAIClient();
-    if (!ai) return "ERROR_MISSING_KEY";
 
     let learnerContext = "";
     if (profile) {
@@ -56,12 +50,6 @@ ${learnerContext}
     return response.text || "I'm having trouble thinking right now.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    const msg = error?.message?.toLowerCase() || "";
-    
-    if (msg.includes("api key not valid") || msg.includes("invalid") || msg.includes("403") || msg.includes("not found")) {
-      return "ERROR_AUTH_FAILURE";
-    }
-    
     return `Error: ${error?.message || "The model is currently unavailable."}`;
   }
 };
@@ -74,7 +62,6 @@ export const evaluateQuizAnswer = async (
 ): Promise<QuizResult> => {
    try {
     const ai = getAIClient();
-    if (!ai) throw new Error("API_KEY_MISSING");
 
     const prompt = `
     Evaluate this AI PM candidate's response.
@@ -108,7 +95,7 @@ export const evaluateQuizAnswer = async (
      return { 
        level: 1, 
        score: 0, 
-       feedback: "Evaluation failed. Please click 'Connect Key' in the sidebar or chat to provide a valid API key." 
+       feedback: "Evaluation failed. Please check your system configuration and try again." 
      };
    }
 };

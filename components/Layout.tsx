@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BrainCircuit, Map, Activity, Wrench, MessageSquare, Menu, X, User, Key, CheckCircle } from 'lucide-react';
+import { BrainCircuit, Map, Activity, Wrench, MessageSquare, User, Key, Settings } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import UserProfileModal from './UserProfileModal';
 
@@ -9,48 +9,9 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
-
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
-  const { setProfileModalOpen, profile } = useUser();
-
-  const checkKey = async () => {
-    if (window.aistudio) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      setHasApiKey(hasKey);
-    } else {
-      setHasApiKey(!!process.env.API_KEY);
-    }
-  };
-
-  useEffect(() => {
-    checkKey();
-    window.addEventListener('focus', checkKey);
-    return () => window.removeEventListener('focus', checkKey);
-  }, []);
-
-  const handleConnectKey = async () => {
-    if (window.aistudio) {
-      try {
-        await window.aistudio.openSelectKey();
-        setHasApiKey(true);
-      } catch (err) {
-        console.error("Failed to open key selector:", err);
-      }
-    } else {
-      alert("⚠️ Environment Note:\n\nIf you are running on Vercel, ensure you have set the 'API_KEY' environment variable in the Vercel dashboard.\n\nRemember to click 'Redeploy' to apply the new variable.");
-    }
-  };
+  // Fix: Included setProfileModalOpen in destructuring and removed API key related states
+  const { profile, setProfileModalOpen } = useUser();
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <Activity size={20} /> },
@@ -61,7 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-row">
       <UserProfileModal />
 
       {/* Sidebar Desktop */}
@@ -94,22 +55,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           ))}
         </nav>
 
-        {/* API Key Connection Section */}
-        <div className="px-4 py-2">
-          {!hasApiKey ? (
-            <button 
-              onClick={handleConnectKey}
-              className="w-full flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all text-sm font-bold animate-pulse"
-            >
-              <Key size={16} /> Connect Gemini API
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 px-4 py-2 text-[10px] text-emerald-500 uppercase font-bold tracking-widest bg-emerald-500/5 rounded-lg border border-emerald-500/10">
-              <CheckCircle size={12} /> API READY
-            </div>
-          )}
-        </div>
-
         {/* User Profile Section */}
         <div className="p-4 border-t border-slate-800">
            <button 
@@ -129,52 +74,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <div className="md:hidden bg-slate-950 border-b border-slate-800 p-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-           <div className="bg-blue-600 p-1.5 rounded-lg">
-            <BrainCircuit className="text-white" size={20} />
-          </div>
-          <span className="font-bold text-lg">AI PM Forge</span>
-        </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-slate-300">
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </button>
-      </div>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-slate-900/95 backdrop-blur-sm pt-20 px-6">
-          <nav className="flex flex-col space-y-4">
-             {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-4 rounded-xl text-lg ${
-                  isActive
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
-                    : 'text-slate-400 hover:bg-slate-800'
-                }`
-              }
-            >
-              {item.icon}
-              <span className="font-medium">{item.name}</span>
-            </NavLink>
-          ))}
-          {!hasApiKey && (
-            <button 
-              onClick={handleConnectKey}
-              className="flex items-center gap-3 px-4 py-4 rounded-xl text-lg bg-amber-500/20 text-amber-400 border border-amber-500/30"
-            >
-              <Key size={20} /> Connect API Key
-            </button>
-          )}
-          </nav>
-        </div>
-      )}
-
+      {/* Main Content */}
       <main className="flex-1 overflow-y-auto bg-slate-900">
         <div className="max-w-6xl mx-auto p-6 md:p-12">
           {children}

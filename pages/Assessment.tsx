@@ -78,6 +78,7 @@ const Assessment: React.FC = () => {
     if (!userAnswer.trim()) return;
     setIsEvaluating(true);
 
+    // Fix: Removed apiKey from evaluateQuizAnswer call
     const result = await evaluateQuizAnswer(
         currentQuestion.question + "\nScenario: " + currentQuestion.scenario,
         userAnswer,

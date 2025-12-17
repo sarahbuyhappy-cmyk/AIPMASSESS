@@ -27,7 +27,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (savedProfile) {
       setProfile(JSON.parse(savedProfile));
     } else {
-      // Prompt new users to set profile
       setTimeout(() => setProfileModalOpen(true), 1000);
     }
   }, []);
