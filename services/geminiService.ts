@@ -10,9 +10,11 @@ export const generateMentorResponse = async (
   try {
     const apiKey = process.env.API_KEY;
     
-    // We attempt to initialize the AI client. 
-    // If apiKey is truly missing, the SDK will throw an error we catch below.
-    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    if (!apiKey) {
+      return "ERROR_MISSING_KEY";
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     
     let learnerContext = "";
     if (profile) {
@@ -51,14 +53,8 @@ ${learnerContext}
     console.error("Gemini Error:", error);
     const msg = error?.message?.toLowerCase() || "";
     
-    // Specific error handling for key issues
     if (msg.includes("api key not valid") || msg.includes("invalid") || msg.includes("403")) {
       return "ERROR_AUTH_FAILURE";
-    }
-    
-    // If the error message suggests the key is missing or the variable is literally not there
-    if (msg.includes("api key not found") || msg.includes("404") || !process.env.API_KEY) {
-       return "ERROR_MISSING_KEY";
     }
     
     return `Error: ${error?.message || "The model is currently unavailable."}`;
@@ -73,7 +69,9 @@ export const evaluateQuizAnswer = async (
 ): Promise<QuizResult> => {
    try {
     const apiKey = process.env.API_KEY;
-    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    if (!apiKey) throw new Error("API_KEY_MISSING");
+
+    const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
     Evaluate this AI PM candidate's response.
@@ -107,7 +105,7 @@ export const evaluateQuizAnswer = async (
      return { 
        level: 1, 
        score: 0, 
-       feedback: "Evaluation failed. Please ensure your API_KEY is set in Vercel and the project has been REDEPLOYED." 
+       feedback: "Evaluation failed. Please ensure your API_KEY is set via the 'Connect Key' button." 
      };
    }
 };

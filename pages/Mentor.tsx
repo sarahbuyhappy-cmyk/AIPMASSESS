@@ -32,38 +32,45 @@ const Mentor: React.FC = () => {
       const hasKey = await window.aistudio.hasSelectedApiKey();
       setHasApiKey(hasKey);
     } else {
-      // If we're on Vercel, we check the injected env variable
       setHasApiKey(!!process.env.API_KEY);
     }
   };
 
   useEffect(() => {
     checkKeyStatus();
+    // Re-check periodically or on focus
+    const interval = setInterval(checkKeyStatus, 3000);
+    window.addEventListener('focus', checkKeyStatus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', checkKeyStatus);
+    };
   }, []);
 
   const handleConnectKey = async () => {
     if (window.aistudio) {
       try {
         await window.aistudio.openSelectKey();
+        // Assume success to avoid race conditions
         setHasApiKey(true);
       } catch (err) {
         console.error("Failed to open key selector:", err);
       }
     } else {
-      alert("⚠️ Manual Setup Required:\n\n1. In Vercel: Add 'API_KEY' to Environment Variables.\n2. CRITICAL: Go to the 'Deployments' tab and REDEPLOY the project for the key to take effect.\n3. Refresh this page after the redeploy is finished.");
+      alert("Manual API Key Selection is only supported in the AI Studio environment. If you are on Vercel, please ensure your API_KEY is set and the project is REDEPLOYED.");
     }
   };
 
   const parseAIResponse = (rawText: string): { cleanedText: string, suggestions: string[] } => {
     if (rawText === "ERROR_MISSING_KEY") {
       return { 
-        cleanedText: "### ⚠️ API Key Still Missing\nI cannot detect the `API_KEY` in the current environment.\n\n**Common Fixes:**\n1. **Redeploy Needed**: If you just added the key in Vercel, you must go to the **Deployments** tab and click **Redeploy** on your latest build. \n2. **Naming**: Ensure the variable name is exactly `API_KEY` (all caps).\n3. **Manual Connection**: If you are just testing, click the **Connect Key** button below.", 
+        cleanedText: "### ⚠️ API Key Required\nI cannot detect an active Gemini API Key.\n\n**If you are on Vercel:**\n1. Go to Project Settings -> Environment Variables.\n2. Ensure `API_KEY` is added.\n3. **IMPORTANT**: Go to the 'Deployments' tab and click **Redeploy** on your latest build.\n\n**Easiest Fix:**\nClick the **'Connect Key'** button below to authorize a key manually for this session.", 
         suggestions: ["Connect Key", "How to get a Key?"] 
       };
     }
     if (rawText === "ERROR_AUTH_FAILURE") {
       return { 
-        cleanedText: "### ❌ Invalid API Key\nThe key provided was rejected by Google. Please check your key in the Google AI Studio console.", 
+        cleanedText: "### ❌ Authentication Failed\nThe API Key provided is either invalid or has expired. Please try connecting a new key.", 
         suggestions: ["Connect Key", "Check API Console"] 
       };
     }
@@ -158,7 +165,7 @@ const Mentor: React.FC = () => {
       setMessages(prev => [...prev, botMsg]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please ensure the app was redeployed on Vercel after adding your key.", timestamp: Date.now() }]);
+      setMessages(prev => [...prev, { role: 'model', text: "I encountered a technical error. Please check your API Key configuration.", timestamp: Date.now() }]);
     } finally {
       setLoading(false);
     }
