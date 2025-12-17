@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { generateMentorResponse } from '../services/geminiService';
 import { Message } from '../types';
-import { Send, Bot, User, Loader2, ArrowLeft, MessageSquarePlus, Key, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Send, Bot, User, Loader2, ArrowLeft, MessageSquarePlus, Key, ExternalLink, AlertTriangle, ShieldCheck } from 'lucide-react';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
@@ -38,40 +38,31 @@ const Mentor: React.FC = () => {
 
   useEffect(() => {
     checkKeyStatus();
-    // Re-check periodically or on focus
-    const interval = setInterval(checkKeyStatus, 3000);
-    window.addEventListener('focus', checkKeyStatus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', checkKeyStatus);
-    };
+    // Re-check periodically to see if key was added
+    const interval = setInterval(checkKeyStatus, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleConnectKey = async () => {
     if (window.aistudio) {
       try {
         await window.aistudio.openSelectKey();
-        // Assume success to avoid race conditions
+        // Assume key selection was successful as per instructions to avoid race conditions
         setHasApiKey(true);
       } catch (err) {
         console.error("Failed to open key selector:", err);
       }
     } else {
-      alert("Manual API Key Selection is only supported in the AI Studio environment. If you are on Vercel, please ensure your API_KEY is set and the project is REDEPLOYED.");
+      alert("Please ensure the 'API_KEY' environment variable is set in your hosting platform (e.g. Vercel) and the project has been REDEPLOYED.");
     }
   };
 
   const parseAIResponse = (rawText: string): { cleanedText: string, suggestions: string[] } => {
-    if (rawText === "ERROR_MISSING_KEY") {
+    if (rawText === "ERROR_MISSING_KEY" || rawText === "ERROR_AUTH_FAILURE") {
+      const isMissing = rawText === "ERROR_MISSING_KEY";
       return { 
-        cleanedText: "### ⚠️ API Key Required\nI cannot detect an active Gemini API Key.\n\n**If you are on Vercel:**\n1. Go to Project Settings -> Environment Variables.\n2. Ensure `API_KEY` is added.\n3. **IMPORTANT**: Go to the 'Deployments' tab and click **Redeploy** on your latest build.\n\n**Easiest Fix:**\nClick the **'Connect Key'** button below to authorize a key manually for this session.", 
+        cleanedText: `### 🔑 API Key Action Required\n\n${isMissing ? "I couldn't find an API Key in your environment." : "The current API Key is invalid or has expired."}\n\n**To fix this instantly:**\n1. Click the **Connect Key** button below.\n2. Paste your Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).\n3. Click 'Select' or 'Save'.\n\n*Note: If you already set it in Vercel, a **Redeploy** is required for it to take effect.*`, 
         suggestions: ["Connect Key", "How to get a Key?"] 
-      };
-    }
-    if (rawText === "ERROR_AUTH_FAILURE") {
-      return { 
-        cleanedText: "### ❌ Authentication Failed\nThe API Key provided is either invalid or has expired. Please try connecting a new key.", 
-        suggestions: ["Connect Key", "Check API Console"] 
       };
     }
 
@@ -130,16 +121,12 @@ const Mentor: React.FC = () => {
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     
-    if (textToSend === "Connect Key" || textToSend === "Reconnect Key") {
+    if (textToSend === "Connect Key") {
         handleConnectKey();
         return;
     }
     if (textToSend === "How to get a Key?") {
         window.open("https://aistudio.google.com/app/apikey", "_blank");
-        return;
-    }
-    if (textToSend === "Check API Console") {
-        window.open("https://aistudio.google.com/", "_blank");
         return;
     }
 
@@ -165,7 +152,7 @@ const Mentor: React.FC = () => {
       setMessages(prev => [...prev, botMsg]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "I encountered a technical error. Please check your API Key configuration.", timestamp: Date.now() }]);
+      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please click 'Connect Key' to ensure your session is authorized.", timestamp: Date.now(), suggestedActions: ["Connect Key"] }]);
     } finally {
       setLoading(false);
     }
@@ -208,14 +195,17 @@ const Mentor: React.FC = () => {
                 </div>
             </div>
             
-            {!hasApiKey && (
-              <button 
-                onClick={handleConnectKey}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg animate-pulse"
-              >
-                <Key size={14} /> Connect API Key
-              </button>
-            )}
+            <button 
+              onClick={handleConnectKey}
+              className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg ${
+                hasApiKey 
+                ? 'bg-slate-800 text-emerald-400 border border-emerald-500/20 hover:bg-slate-700' 
+                : 'bg-amber-600 hover:bg-amber-500 text-white animate-pulse'
+              }`}
+            >
+              {hasApiKey ? <ShieldCheck size={14} /> : <Key size={14} />} 
+              {hasApiKey ? 'Key Connected' : 'Connect API Key'}
+            </button>
         </div>
       </div>
 
@@ -243,12 +233,12 @@ const Mentor: React.FC = () => {
                             key={i}
                             onClick={() => handleSend(action)}
                             className={`text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
-                              (action === "Connect Key" || action === "Reconnect Key") 
+                              action === "Connect Key" 
                               ? "bg-amber-600/20 border-amber-500 text-amber-400 hover:bg-amber-600/40" 
                               : "bg-slate-900 border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300"
                             }`}
                           >
-                              {(action === "Connect Key" || action === "Reconnect Key") ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
+                              {action === "Connect Key" ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
                           </button>
                       ))}
                   </div>

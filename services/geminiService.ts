@@ -2,20 +2,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizResult, LearnerProfile } from '../types';
 
+/**
+ * Helper to get the API key. It checks process.env first.
+ * The GoogleGenAI instance is created fresh to pick up any key changes.
+ */
+const getAIClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({ apiKey });
+};
+
 export const generateMentorResponse = async (
   userMessage: string,
   context: string,
   profile: LearnerProfile | null
 ): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
-    
-    if (!apiKey) {
-      return "ERROR_MISSING_KEY";
-    }
+    const ai = getAIClient();
+    if (!ai) return "ERROR_MISSING_KEY";
 
-    const ai = new GoogleGenAI({ apiKey });
-    
     let learnerContext = "";
     if (profile) {
         learnerContext = `
@@ -53,7 +58,7 @@ ${learnerContext}
     console.error("Gemini Error:", error);
     const msg = error?.message?.toLowerCase() || "";
     
-    if (msg.includes("api key not valid") || msg.includes("invalid") || msg.includes("403")) {
+    if (msg.includes("api key not valid") || msg.includes("invalid") || msg.includes("403") || msg.includes("not found")) {
       return "ERROR_AUTH_FAILURE";
     }
     
@@ -68,10 +73,8 @@ export const evaluateQuizAnswer = async (
   profile: LearnerProfile | null
 ): Promise<QuizResult> => {
    try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) throw new Error("API_KEY_MISSING");
-
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = getAIClient();
+    if (!ai) throw new Error("API_KEY_MISSING");
 
     const prompt = `
     Evaluate this AI PM candidate's response.
@@ -105,7 +108,7 @@ export const evaluateQuizAnswer = async (
      return { 
        level: 1, 
        score: 0, 
-       feedback: "Evaluation failed. Please ensure your API_KEY is set via the 'Connect Key' button." 
+       feedback: "Evaluation failed. Please click 'Connect Key' in the sidebar or chat to provide a valid API key." 
      };
    }
 };
