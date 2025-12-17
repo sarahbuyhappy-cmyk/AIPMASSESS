@@ -10,14 +10,8 @@ export const generateMentorResponse = async (
   try {
     const apiKey = process.env.API_KEY;
     
-    // Check if API_KEY exists
-    if (!apiKey || apiKey === "undefined" || apiKey === "") {
-      console.error("API_KEY is missing in environment variables.");
-      return "ERROR_MISSING_KEY";
-    }
-
-    // Initialize inside the function to use the most recent key (especially for aistudio selection)
-    const ai = new GoogleGenAI({ apiKey });
+    // Attempt to use the key even if it looks empty, to catch the actual API error
+    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
     
     let learnerContext = "";
     if (profile) {
@@ -55,13 +49,14 @@ ${learnerContext}
   } catch (error: any) {
     console.error("Gemini Error:", error);
     const msg = error?.message || "";
-    if (msg.includes("API key not valid") || msg.includes("invalid") || msg.includes("403")) {
-      return "ERROR_INVALID_KEY";
+    // If we get a clear authentication error, return a specific code for the UI
+    if (msg.includes("API key not valid") || msg.includes("invalid") || msg.includes("403") || msg.includes("API_KEY_INVALID")) {
+      return "ERROR_AUTH_FAILURE";
     }
-    if (msg.includes("entity was not found") || msg.includes("404")) {
-       return "ERROR_KEY_NOT_FOUND";
+    if (msg.includes("API key not found") || msg.includes("404") || !process.env.API_KEY) {
+       return "ERROR_MISSING_KEY";
     }
-    return "The model is currently unavailable. Please check your connection or API Key configuration.";
+    return `Error: ${msg || "The model is currently unavailable."}`;
   }
 };
 
@@ -73,9 +68,8 @@ export const evaluateQuizAnswer = async (
 ): Promise<QuizResult> => {
    try {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) throw new Error("Missing API Key");
+    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
-    const ai = new GoogleGenAI({ apiKey });
     const prompt = `
     Evaluate this AI PM candidate's response.
     Question: ${question}
@@ -108,7 +102,7 @@ export const evaluateQuizAnswer = async (
      return { 
        level: 1, 
        score: 0, 
-       feedback: "Evaluation failed. Please connect a valid Gemini API Key to enable AI assessment." 
+       feedback: "Evaluation failed. Please ensure a valid Gemini API Key is configured in the environment or selected via the Connect button." 
      };
    }
 };

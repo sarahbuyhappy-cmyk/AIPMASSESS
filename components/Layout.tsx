@@ -24,15 +24,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
   const { setProfileModalOpen, profile } = useUser();
 
+  const checkKey = async () => {
+    if (window.aistudio) {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      setHasApiKey(hasKey);
+    } else {
+      setHasApiKey(!!process.env.API_KEY);
+    }
+  };
+
   useEffect(() => {
-    const checkKey = async () => {
-      if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(hasKey);
-      } else {
-        setHasApiKey(process.env.API_KEY !== undefined && process.env.API_KEY !== "");
-      }
-    };
     checkKey();
     window.addEventListener('focus', checkKey);
     return () => window.removeEventListener('focus', checkKey);
@@ -40,8 +41,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const handleConnectKey = async () => {
     if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
+      try {
+        await window.aistudio.openSelectKey();
+        setHasApiKey(true);
+      } catch (err) {
+        console.error("Failed to open key selector:", err);
+      }
     } else {
       alert("⚠️ Environment Note:\n\nIf you are running on Vercel, ensure you have set the 'API_KEY' environment variable in the Vercel dashboard.\n\nRemember to click 'Redeploy' to apply the new variable.");
     }
