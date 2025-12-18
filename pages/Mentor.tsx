@@ -2,20 +2,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { generateMentorResponse } from '../services/geminiService';
 import { Message } from '../types';
-import { Send, Bot, User, Loader2, ArrowLeft, MessageSquarePlus, ShieldCheck } from 'lucide-react';
+import { Send, Bot, User, Loader2, ArrowLeft, MessageSquarePlus, ShieldCheck, Key, AlertTriangle } from 'lucide-react';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
 const Mentor: React.FC = () => {
   const { profile } = useUser();
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
   
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'model',
       text: profile 
-        ? `Hello ${profile.name}. I'm your AI PM Coach. Since you have a background in ${profile.industry}, I'll tailor my explanations to that context. Ask me anything!`
-        : "Hello. I am your AI PM Coach. I'm here to help you navigate the transition from traditional product management to building with LLMs. Ask me about the roadmap, technical concepts (like RAG vs Fine-tuning), or to simulate an interview question.",
+        ? `Hello ${profile.name}. I'm your AI PM Coach. Given your background in ${profile.industry}, I'll use familiar industry cases to help explain. Feel free to ask me anything!`
+        : "Hello. I'm your AI PM Coach. I'm here to help you transition from traditional product management to an AI-driven probabilistic model. You can ask about learning paths, technical concepts like RAG or fine-tuning, or let me simulate an interview.",
       timestamp: Date.now()
     }
   ]);
@@ -26,7 +27,34 @@ const Mentor: React.FC = () => {
   const navigate = useNavigate();
   const hasAutoSentRef = useRef(false);
 
+  const checkKeyStatus = async () => {
+    if (window.aistudio) {
+      const selected = await window.aistudio.hasSelectedApiKey();
+      setHasApiKey(selected);
+    } else {
+      setHasApiKey(!!process.env.API_KEY);
+    }
+  };
+
+  useEffect(() => {
+    checkKeyStatus();
+  }, []);
+
+  const handleConnectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true);
+    }
+  };
+
   const parseAIResponse = (rawText: string): { cleanedText: string, suggestions: string[] } => {
+    if (rawText === "ERROR_MISSING_KEY") {
+      return {
+        cleanedText: "### ⚠️ API Key Not Connected\nIt seems you haven't configured your API key yet. To start the conversation, please click the **\"Connect API Key\"** button below. Paste your Gemini API Key in the pop-up window and save it.\n\nYou can get a free key from [Google AI Studio](https://aistudio.google.com/app/apikey).",
+        suggestions: ["Connect API Key"]
+      };
+    }
+
     const parts = rawText.split('---FOLLOW_UP---');
     const cleanedText = parts[0].trim();
     let suggestions: string[] = [];
@@ -42,7 +70,7 @@ const Mentor: React.FC = () => {
     if (profile && messages.length === 1 && messages[0].role === 'model' && !hasAutoSentRef.current) {
          setMessages([{
             role: 'model',
-            text: `Hello ${profile.name}. I'm ready to help you leverage your ${profile.yearsExperience} years of experience as a ${profile.role} to break into AI. I'll use ${profile.industry} analogies where possible.`,
+            text: `Hello ${profile.name}. Ready to leverage your experience in ${profile.industry} to start your AI transition? I'll do my best to use industry analogies to lower the learning curve.`,
             timestamp: Date.now()
          }]);
     }
@@ -82,6 +110,11 @@ const Mentor: React.FC = () => {
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     
+    if (textToSend === "Connect API Key") {
+      handleConnectKey();
+      return;
+    }
+
     if (!textToSend.trim() || loading) return;
 
     const userMsg: Message = { role: 'user', text: textToSend, timestamp: Date.now() };
@@ -92,7 +125,6 @@ const Mentor: React.FC = () => {
     const context = messages.slice(-3).map(m => `${m.role}: ${m.text}`).join('\n');
 
     try {
-      // Fix: Removed apiKey from generateMentorResponse call
       const rawText = await generateMentorResponse(userMsg.text, context, profile);
       const { cleanedText, suggestions } = parseAIResponse(rawText);
       
@@ -103,9 +135,14 @@ const Mentor: React.FC = () => {
           suggestedActions: suggestions 
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error. Please check your system configuration.", timestamp: Date.now() }]);
+      setMessages(prev => [...prev, { 
+        role: 'model', 
+        text: "Sorry, something went wrong. Please ensure you've connected your API key.", 
+        timestamp: Date.now(),
+        suggestedActions: ["Connect API Key"]
+      }]);
     } finally {
       setLoading(false);
     }
@@ -126,7 +163,7 @@ const Mentor: React.FC = () => {
                 onClick={() => navigate(location.state.returnTo)}
                 className="self-start flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
             >
-                <ArrowLeft size={16} /> Return to {location.state.returnLabel || 'Previous Page'}
+                <ArrowLeft size={16} /> Return to {location.state.returnLabel || 'previous page'}
             </button>
         )}
 
@@ -148,8 +185,13 @@ const Mentor: React.FC = () => {
                 </div>
             </div>
             
-            <div className="px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <ShieldCheck size={14} /> System Ready
+            <div className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 border transition-all ${
+              hasApiKey 
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+              : 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
+            }`}>
+              {hasApiKey ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
+              {hasApiKey ? 'System Ready' : 'Key Not Connected'}
             </div>
         </div>
       </div>
@@ -177,9 +219,13 @@ const Mentor: React.FC = () => {
                           <button
                             key={i}
                             onClick={() => handleSend(action)}
-                            className="text-xs bg-slate-900 border border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
+                            className={`text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
+                              action === "Connect API Key" 
+                              ? "bg-amber-600 text-slate-950 border-amber-500 font-bold hover:bg-amber-500" 
+                              : "bg-slate-900 border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300"
+                            }`}
                           >
-                              <MessageSquarePlus size={12} /> {action}
+                              {action === "Connect API Key" ? <Key size={12} /> : <MessageSquarePlus size={12} />} {action}
                           </button>
                       ))}
                   </div>
@@ -206,7 +252,7 @@ const Mentor: React.FC = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about AI Strategy, MLOps, or mock interviews..."
+              placeholder="Ask about AI strategy, MLOps, or mock interviews..."
               className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-4 pr-12 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             />
             <button 

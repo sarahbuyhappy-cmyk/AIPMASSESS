@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BrainCircuit, Map, Activity, Wrench, MessageSquare, User, Key, Settings } from 'lucide-react';
+import { BrainCircuit, Map, Activity, Wrench, MessageSquare, User, Key, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import UserProfileModal from './UserProfileModal';
 
@@ -10,14 +10,44 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // Fix: Included setProfileModalOpen in destructuring and removed API key related states
   const { profile, setProfileModalOpen } = useUser();
+  const [hasKey, setHasKey] = useState<boolean>(false);
+
+  // Function to check API Key status
+  const checkKey = async () => {
+    if (window.aistudio) {
+      const selected = await window.aistudio.hasSelectedApiKey();
+      setHasKey(selected);
+    } else {
+      setHasKey(!!process.env.API_KEY);
+    }
+  };
+
+  useEffect(() => {
+    checkKey();
+    // Periodically check key status to update UI if user connects/disconnects
+    const interval = setInterval(checkKey, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleConnectKey = async () => {
+    if (window.aistudio) {
+      try {
+        await window.aistudio.openSelectKey();
+        setHasKey(true);
+      } catch (err) {
+        console.error("Failed to open key selector:", err);
+      }
+    } else {
+      alert("Please ensure the API_KEY is configured in your environment.");
+    }
+  };
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: <Activity size={20} /> },
     { name: 'Roadmap', path: '/roadmap', icon: <Map size={20} /> },
     { name: 'Assessment', path: '/assessment', icon: <BrainCircuit size={20} /> },
-    { name: 'Toolbox', path: '/toolbox', icon: <Wrench size={20} /> },
+    { name: 'PM Toolbox', path: '/toolbox', icon: <Wrench size={20} /> },
     { name: 'AI Mentor', path: '/mentor', icon: <MessageSquare size={20} /> },
   ];
 
@@ -54,6 +84,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </NavLink>
           ))}
         </nav>
+
+        {/* API Key Connection Button */}
+        <div className="px-4 py-2">
+           <button 
+             onClick={handleConnectKey}
+             className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-xs font-bold ${
+               hasKey 
+               ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10' 
+               : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20 animate-pulse shadow-lg shadow-amber-900/20'
+             }`}
+           >
+              <div className="flex items-center gap-2">
+                {hasKey ? <ShieldCheck size={16} /> : <AlertCircle size={16} />}
+                {hasKey ? 'API READY' : 'CONNECT KEY'}
+              </div>
+              <Key size={14} className={hasKey ? "opacity-50" : "animate-bounce"} />
+           </button>
+        </div>
 
         {/* User Profile Section */}
         <div className="p-4 border-t border-slate-800">

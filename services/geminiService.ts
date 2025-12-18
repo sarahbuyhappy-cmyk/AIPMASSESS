@@ -2,9 +2,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizResult, LearnerProfile } from '../types';
 
-// Use process.env.API_KEY directly as required by the guidelines.
+/**
+ * Dynamically initialize to ensure updated environment keys are picked up.
+ */
 const getAIClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("MISSING_API_KEY");
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 export const generateMentorResponse = async (
@@ -50,6 +56,9 @@ ${learnerContext}
     return response.text || "I'm having trouble thinking right now.";
   } catch (error: any) {
     console.error("Gemini Error:", error);
+    if (error.message === "MISSING_API_KEY") {
+      return "ERROR_MISSING_KEY";
+    }
     return `Error: ${error?.message || "The model is currently unavailable."}`;
   }
 };
@@ -90,12 +99,14 @@ export const evaluateQuizAnswer = async (
     });
 
     return JSON.parse(response.text || '{}') as QuizResult;
-   } catch (error) {
+   } catch (error: any) {
      console.error("Evaluation Error:", error);
      return { 
        level: 1, 
        score: 0, 
-       feedback: "Evaluation failed. Please check your system configuration and try again." 
+       feedback: error.message === "MISSING_API_KEY" 
+         ? "API Key not detected. Please click 'Connect Key' in the sidebar to configure." 
+         : "Evaluation failed. Please check your system configuration." 
      };
    }
 };
