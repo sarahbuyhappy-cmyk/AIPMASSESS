@@ -116,4 +116,8 @@ export interface UserContextType {
   updateProfile: (profile: LearnerProfile) => void;
   isProfileModalOpen: boolean;
   setProfileModalOpen: (isOpen: boolean) => void;
+
+  // API Key Management
+  apiKey: string;
+  setApiKey: (key: string) => void;
 }

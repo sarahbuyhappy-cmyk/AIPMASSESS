@@ -16,7 +16,7 @@ const Assessment: React.FC = () => {
   const [searchParams] = useSearchParams();
   
   // Use global user context
-  const { scores, setScore, profile } = useUser();
+  const { scores, setScore, profile, apiKey } = useUser();
 
   // State for Quiz
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -78,12 +78,12 @@ const Assessment: React.FC = () => {
     if (!userAnswer.trim()) return;
     setIsEvaluating(true);
 
-    // Fix: Removed apiKey from evaluateQuizAnswer call
     const result = await evaluateQuizAnswer(
         currentQuestion.question + "\nScenario: " + currentQuestion.scenario,
         userAnswer,
         currentQuestion.rubric,
-        profile
+        profile,
+        apiKey
     );
 
     setQuizResults(prev => ({

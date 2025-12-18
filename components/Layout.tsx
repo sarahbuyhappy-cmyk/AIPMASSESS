@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BrainCircuit, Map, Activity, Wrench, MessageSquare, User, Key, ShieldCheck, AlertCircle } from 'lucide-react';
+import { BrainCircuit, Map, Activity, Wrench, MessageSquare, User, Key, ShieldCheck, AlertCircle, X, Settings } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import UserProfileModal from './UserProfileModal';
 
@@ -10,37 +10,19 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { profile, setProfileModalOpen } = useUser();
-  const [hasKey, setHasKey] = useState<boolean>(false);
-
-  // Function to check API Key status
-  const checkKey = async () => {
-    if (window.aistudio) {
-      const selected = await window.aistudio.hasSelectedApiKey();
-      setHasKey(selected);
-    } else {
-      setHasKey(!!process.env.API_KEY);
-    }
-  };
+  const { profile, setProfileModalOpen, apiKey, setApiKey } = useUser();
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [tempKey, setTempKey] = useState(apiKey);
+  const [envKeyDetected, setEnvKeyDetected] = useState(false);
 
   useEffect(() => {
-    checkKey();
-    // Periodically check key status to update UI if user connects/disconnects
-    const interval = setInterval(checkKey, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    setTempKey(apiKey);
+    setEnvKeyDetected(!!process.env.API_KEY);
+  }, [apiKey]);
 
-  const handleConnectKey = async () => {
-    if (window.aistudio) {
-      try {
-        await window.aistudio.openSelectKey();
-        setHasKey(true);
-      } catch (err) {
-        console.error("Failed to open key selector:", err);
-      }
-    } else {
-      alert("Please ensure the API_KEY is configured in your environment.");
-    }
+  const handleSaveKey = () => {
+    setApiKey(tempKey.trim());
+    setIsKeyModalOpen(false);
   };
 
   const navItems = [
@@ -51,9 +33,60 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'AI Mentor', path: '/mentor', icon: <MessageSquare size={20} /> },
   ];
 
+  const hasActiveKey = apiKey.length > 5 || envKeyDetected;
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-row">
       <UserProfileModal />
+
+      {/* Manual API Key Modal */}
+      {isKeyModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+             <div className="flex justify-between items-center mb-2">
+               <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                 <Key className="text-blue-400" size={20} /> API Configuration
+               </h2>
+               <button onClick={() => setIsKeyModalOpen(false)} className="text-slate-500 hover:text-white">
+                 <X size={24} />
+               </button>
+             </div>
+             
+             <p className="text-sm text-slate-400">
+               If you are seeing an API Key error, please paste your Gemini API Key here. It will be saved locally in your browser.
+             </p>
+
+             <div className="space-y-2">
+               <label className="text-xs font-bold text-slate-500 uppercase">Gemini API Key</label>
+               <input 
+                 type="password"
+                 value={tempKey}
+                 onChange={(e) => setTempKey(e.target.value)}
+                 placeholder="AIzaSy..."
+                 className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none"
+               />
+               <p className="text-[10px] text-slate-500">
+                 Get a key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-400 underline">Google AI Studio</a>.
+               </p>
+             </div>
+
+             <div className="pt-4 flex gap-3">
+               <button 
+                 onClick={() => setIsKeyModalOpen(false)}
+                 className="flex-1 py-2 text-sm font-bold text-slate-400 hover:text-white transition-colors"
+               >
+                 Cancel
+               </button>
+               <button 
+                 onClick={handleSaveKey}
+                 className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg"
+               >
+                 Save & Connect
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
 
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-950 border-r border-slate-800 h-screen sticky top-0">
@@ -88,18 +121,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* API Key Connection Button */}
         <div className="px-4 py-2">
            <button 
-             onClick={handleConnectKey}
+             onClick={() => setIsKeyModalOpen(true)}
              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-xs font-bold ${
-               hasKey 
+               hasActiveKey 
                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10' 
                : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20 animate-pulse shadow-lg shadow-amber-900/20'
              }`}
            >
               <div className="flex items-center gap-2">
-                {hasKey ? <ShieldCheck size={16} /> : <AlertCircle size={16} />}
-                {hasKey ? 'API READY' : 'CONNECT KEY'}
+                {hasActiveKey ? <ShieldCheck size={16} /> : <AlertCircle size={16} />}
+                {hasActiveKey ? 'API READY' : 'CONNECT KEY'}
               </div>
-              <Key size={14} className={hasKey ? "opacity-50" : "animate-bounce"} />
+              <Settings size={14} className={hasActiveKey ? "opacity-50" : "animate-bounce"} />
            </button>
         </div>
 

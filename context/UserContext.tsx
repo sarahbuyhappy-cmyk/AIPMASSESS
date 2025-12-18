@@ -21,6 +21,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
 
+  // API Key State
+  const [apiKey, setApiKeyInternal] = useState<string>('');
+
   // Load from local storage on mount
   useEffect(() => {
     const savedProfile = localStorage.getItem('ai_pm_profile');
@@ -29,7 +32,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       setTimeout(() => setProfileModalOpen(true), 1000);
     }
+
+    const savedKey = localStorage.getItem('user_gemini_api_key');
+    if (savedKey) {
+      setApiKeyInternal(savedKey);
+    }
   }, []);
+
+  const setApiKey = (key: string) => {
+    setApiKeyInternal(key);
+    localStorage.setItem('user_gemini_api_key', key);
+  };
 
   const updateProfile = (newProfile: LearnerProfile) => {
     setProfile(newProfile);
@@ -79,7 +92,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       profile,
       updateProfile,
       isProfileModalOpen,
-      setProfileModalOpen
+      setProfileModalOpen,
+      apiKey,
+      setApiKey
     }}>
       {children}
     </UserContext.Provider>

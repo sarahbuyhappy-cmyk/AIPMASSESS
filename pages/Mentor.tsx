@@ -8,8 +8,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
 const Mentor: React.FC = () => {
-  const { profile } = useUser();
+  const { profile, apiKey, setApiKey } = useUser();
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
+  const [showDirectPaste, setShowDirectPaste] = useState(false);
+  const [pasteValue, setPasteValue] = useState('');
   
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -27,30 +29,23 @@ const Mentor: React.FC = () => {
   const navigate = useNavigate();
   const hasAutoSentRef = useRef(false);
 
-  const checkKeyStatus = async () => {
-    if (window.aistudio) {
-      const selected = await window.aistudio.hasSelectedApiKey();
-      setHasApiKey(selected);
-    } else {
-      setHasApiKey(!!process.env.API_KEY);
-    }
-  };
-
   useEffect(() => {
-    checkKeyStatus();
-  }, []);
+    setHasApiKey(apiKey.length > 5 || !!process.env.API_KEY);
+  }, [apiKey]);
 
-  const handleConnectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
+  const handlePasteKey = () => {
+    if (pasteValue.trim()) {
+      setApiKey(pasteValue.trim());
+      setShowDirectPaste(false);
+      setPasteValue('');
+      // After saving, the next response should work
     }
   };
 
   const parseAIResponse = (rawText: string): { cleanedText: string, suggestions: string[] } => {
     if (rawText === "ERROR_MISSING_KEY") {
       return {
-        cleanedText: "### ⚠️ API Key Not Connected\nIt seems you haven't configured your API key yet. To start the conversation, please click the **\"Connect API Key\"** button below. Paste your Gemini API Key in the pop-up window and save it.\n\nYou can get a free key from [Google AI Studio](https://aistudio.google.com/app/apikey).",
+        cleanedText: "### ⚠️ API Key Not Connected\nIt seems you haven't configured your API key yet. To start the conversation, please paste your Gemini API Key below or use the 'Connect API Key' button in the sidebar.",
         suggestions: ["Connect API Key"]
       };
     }
@@ -87,7 +82,7 @@ const Mentor: React.FC = () => {
              setMessages(prev => [...prev, userMsg]);
              setLoading(true);
              
-             generateMentorResponse(query, skillContext, profile).then(rawText => {
+             generateMentorResponse(query, skillContext, profile, apiKey).then(rawText => {
                  const { cleanedText, suggestions } = parseAIResponse(rawText);
                  setMessages(prev => [...prev, { 
                      role: 'model', 
@@ -99,19 +94,20 @@ const Mentor: React.FC = () => {
              });
         }, 500);
     }
-  }, [location.state, profile]);
+  }, [location.state, profile, apiKey]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, showDirectPaste]);
 
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     
+    // Check for the specific chip action label
     if (textToSend === "Connect API Key") {
-      handleConnectKey();
+      setShowDirectPaste(true);
       return;
     }
 
@@ -125,7 +121,7 @@ const Mentor: React.FC = () => {
     const context = messages.slice(-3).map(m => `${m.role}: ${m.text}`).join('\n');
 
     try {
-      const rawText = await generateMentorResponse(userMsg.text, context, profile);
+      const rawText = await generateMentorResponse(userMsg.text, context, profile, apiKey);
       const { cleanedText, suggestions } = parseAIResponse(rawText);
       
       const botMsg: Message = { 
@@ -139,7 +135,7 @@ const Mentor: React.FC = () => {
       console.error(e);
       setMessages(prev => [...prev, { 
         role: 'model', 
-        text: "Sorry, something went wrong. Please ensure you've connected your API key.", 
+        text: "Sorry, I encountered an issue. Please ensure your API key is correctly configured.", 
         timestamp: Date.now(),
         suggestedActions: ["Connect API Key"]
       }]);
@@ -221,7 +217,7 @@ const Mentor: React.FC = () => {
                             onClick={() => handleSend(action)}
                             className={`text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
                               action === "Connect API Key" 
-                              ? "bg-amber-600 text-slate-950 border-amber-500 font-bold hover:bg-amber-500" 
+                              ? "bg-amber-600 text-slate-950 border-amber-500 font-bold hover:bg-amber-500 shadow-lg" 
                               : "bg-slate-900 border-blue-500/30 hover:border-blue-400 hover:bg-blue-900/20 text-blue-300"
                             }`}
                           >
@@ -232,6 +228,45 @@ const Mentor: React.FC = () => {
               )}
             </div>
           ))}
+
+          {showDirectPaste && (
+            <div className="ml-12 bg-slate-900 border border-amber-500/50 rounded-xl p-5 animate-in slide-in-from-bottom-2 duration-300 shadow-2xl shadow-amber-900/20 max-w-md">
+              <div className="flex items-center gap-2 mb-3 text-amber-400">
+                <Key size={18} />
+                <label className="text-sm font-bold uppercase tracking-tight">Paste Your Gemini API Key</label>
+              </div>
+              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                We'll save this locally in your browser so you can chat with your AI Mentor.
+              </p>
+              <div className="flex gap-2">
+                <input 
+                  autoFocus
+                  type="password"
+                  value={pasteValue}
+                  onChange={(e) => setPasteValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePasteKey()}
+                  placeholder="AIzaSy..."
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <button 
+                  onClick={handlePasteKey}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all flex-shrink-0"
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={() => setShowDirectPaste(false)}
+                  className="text-slate-500 hover:text-white text-xs px-2"
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="mt-3 text-[10px] text-slate-500">
+                Get a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-400 hover:underline">aistudio.google.com</a>
+              </div>
+            </div>
+          )}
+
           {loading && (
              <div className="flex gap-4">
               <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">

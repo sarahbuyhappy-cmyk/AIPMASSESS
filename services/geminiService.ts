@@ -3,23 +3,25 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { QuizResult, LearnerProfile } from '../types';
 
 /**
- * Dynamically initialize to ensure updated environment keys are picked up.
+ * Initialize AI client using the best available key.
+ * Priority: Manual Key > process.env.API_KEY
  */
-const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
+const getAIClient = (manualKey?: string) => {
+  const key = manualKey || process.env.API_KEY;
+  if (!key) {
     throw new Error("MISSING_API_KEY");
   }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: key });
 };
 
 export const generateMentorResponse = async (
   userMessage: string,
   context: string,
-  profile: LearnerProfile | null
+  profile: LearnerProfile | null,
+  manualKey?: string
 ): Promise<string> => {
   try {
-    const ai = getAIClient();
+    const ai = getAIClient(manualKey);
 
     let learnerContext = "";
     if (profile) {
@@ -67,10 +69,11 @@ export const evaluateQuizAnswer = async (
   question: string,
   userAnswer: string,
   rubric: string,
-  profile: LearnerProfile | null
+  profile: LearnerProfile | null,
+  manualKey?: string
 ): Promise<QuizResult> => {
    try {
-    const ai = getAIClient();
+    const ai = getAIClient(manualKey);
 
     const prompt = `
     Evaluate this AI PM candidate's response.
@@ -105,7 +108,7 @@ export const evaluateQuizAnswer = async (
        level: 1, 
        score: 0, 
        feedback: error.message === "MISSING_API_KEY" 
-         ? "API Key not detected. Please click 'Connect Key' in the sidebar to configure." 
+         ? "API Key not detected. Please provide an API key via the 'Connect API Key' settings in the sidebar." 
          : "Evaluation failed. Please check your system configuration." 
      };
    }
